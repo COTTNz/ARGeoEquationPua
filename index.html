@@ -2,27 +2,43 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AR Smart Geometry Equation</title>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMckDpbDMBIZB0Ax10Atd/DAmZvGYviG3eUbwJGjSxdewDUvc" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmImTYLVuk" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Volume Estimator v2.1</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+
     <style>
-        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; }
-        .screen { display: none; }
-        .active-screen { display: flex; }
-        #tracking-screen video {
+        :root {
+            --primary-color: #00aaff;
+            --dark-bg: #121212;
+            --light-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --font-main: 'IBM Plex Sans Thai', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: var(--font-main);
+            color: var(--text-color);
+            background-color: var(--dark-bg);
+        }
+
+        #mainContainer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #video {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -31,566 +47,448 @@
             min-height: 100%;
             width: auto;
             height: auto;
-            object-fit: cover;
         }
-        .whitespace-pre-wrap { white-space: pre-wrap; }
-        .fade-in { animation: fadeIn 0.5s ease-in-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        #formula-list {
-            max-height: 35vh; 
-            overflow-y: auto; 
+
+        #arScene {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 5;
+            pointer-events: none;
         }
-        #tracking-ui-bottom {
-            padding-bottom: calc(env(safe-area-inset-bottom, 0) + 0.5rem);
+
+        #overlayContainer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            pointer-events: none; 
         }
-        #formula-ui {
-            padding-bottom: calc(env(safe-area-inset-bottom, 0) + 1.5rem);
-        }
-        .detection-box {
+
+        .bbox-div {
             position: absolute;
-            border-width: 4px;
-            border-radius: 0.5rem;
-            z-index: 20;
-            transition: background-color 0.2s ease, top 0.1s linear, left 0.1s linear, width 0.1s linear, height 0.1s linear;
-        }
-        .clickable-box {
+            border: 2px solid var(--primary-color);
+            background-color: rgba(0, 170, 255, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.5);
+            transition: all 0.2s ease-out;
+            pointer-events: auto;
             cursor: pointer;
         }
-        .clickable-box:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-        .detection-label {
+
+        .bbox-label {
             position: absolute;
-            top: -28px;
-            left: -4px;
-            color: white;
+            top: -30px;
+            left: 0;
+            background-color: var(--primary-color);
+            color: #000;
             padding: 4px 8px;
-            border-radius: 6px;
+            border-radius: 5px;
+            font-weight: 500;
             font-size: 14px;
-            font-weight: bold;
             white-space: nowrap;
         }
+        
+        .bbox-confidence {
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .confidence-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            border-radius: 3px;
+        }
+
+        .info-popup {
+            position: absolute;
+            display: block;
+            width: 220px;
+            background-color: rgba(30, 30, 30, 0.95);
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            z-index: 100;
+            pointer-events: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .info-popup h3 { margin: 0 0 10px 0; color: var(--primary-color); }
+        .info-popup p { margin: 5px 0; font-size: 14px; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        #uiContainer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 20;
+            pointer-events: none;
+        }
+        #uiContainer > * { pointer-events: auto; }
+        
+        #loader {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px; border-radius: 10px; text-align: center;
+        }
+        #loader i { font-size: 24px; margin-bottom: 10px; color: var(--primary-color); animation: spin 1.5s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .tabs {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            display: flex; background-color: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(5px);
+        }
+        .tab-button {
+            flex: 1; padding: 15px; border: none; background-color: transparent;
+            color: var(--text-color); font-size: 16px; border-top: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+        .tab-button.active { border-top-color: var(--primary-color); color: var(--primary-color); font-weight: bold; }
+        .tab-button i { margin-right: 8px; }
+
+        #manualCalc {
+            display: none; position: absolute; bottom: 57px; left: 0;
+            width: 100%; height: calc(100% - 57px);
+            background-color: var(--dark-bg); padding: 20px;
+            box-sizing: border-box; overflow-y: auto;
+        }
+        #manualCalc input, #manualCalc select, #manualCalc button {
+             width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 5px;
+             border: 1px solid #555; background-color: #333; color: white;
+             box-sizing: border-box; font-size: 16px; font-family: var(--font-main);
+        }
+        #manualCalc button { background-color: var(--primary-color); color: #000; font-weight: bold; }
+        #manualResult { margin-top: 20px; text-align: center; }
+
     </style>
 </head>
-<body class="text-slate-200 overflow-hidden">
-
-    <div id="welcome-screen" class="screen active-screen flex-col justify-center items-center h-screen text-center p-6">
-        <div class="max-w-2xl">
-            <h1 class="text-4xl md:text-6xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-500">AR Smart Geometry Equation</h1>
-            <p class="text-lg md:text-xl text-slate-400 mb-8">เรียนรู้คณิตศาสตร์ผ่านสิ่งของรอบตัวคุณ<br class="hidden md:block"></p>
-            <button id="start-tracking-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg shadow-sky-500/30 transition-all transform hover:scale-105 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center mx-auto">
-                <span id="loading-model-text" style="display:none;" class="flex items-center"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>กำลังโหลดโมเดล...</span>
-                <span id="start-btn-text">เริ่มต้นการเรียนรู้</span>
-            </button>
-            <p id="model-error-text" class="text-red-400 mt-4" style="display:none;">ไม่สามารถโหลดโมเดล AI ได้ กรุณาลองรีเฟรชหน้าจอ</p>
-        </div>
+<body>
+    <div id="mainContainer">
+        <video id="video" playsinline muted autoplay></video>
+        <div id="overlayContainer"></div> 
+        <a-scene id="arScene" embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+            <a-entity id="arObjectsContainer"></a-entity>
+            <a-camera id="camera" position="0 0 0" look-controls-enabled="false" wasd-controls-enabled="false"></a-camera>
+        </a-scene>
     </div>
 
-    <div id="tracking-screen" class="screen relative w-screen h-screen bg-black">
-        <video id="video" autoplay playsinline muted></video>
-        <div id="detection-overlay" class="absolute inset-0 z-10"></div>
-        <div class="absolute top-4 left-4 z-30">
-            <button id="back-to-welcome-btn" class="bg-slate-900/70 hover:bg-slate-900/90 text-white py-2 px-4 rounded-lg backdrop-blur-sm">&lt; กลับ</button>
-        </div>
-        <div id="tracking-ui-bottom" class="absolute bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-md z-30 space-y-3">
-            <div id="tracking-instructions" class="bg-slate-900/70 p-3 rounded-xl text-center backdrop-blur-sm">
-                กำลังค้นหาวัตถุ...
-            </div>
-            <div id="manual-shape-selector" class="grid grid-cols-3 gap-2" style="display: none;">
-            </div>
-        </div>
-    </div>
+    <div id="uiContainer">
+        <div id="loader"><i class="fas fa-sync-alt"></i><p>กำลังโหลดโมเดล...</p></div>
 
-    <div id="ar-screen" class="screen flex-col w-screen h-screen">
-        <div id="ar-canvas-container" class="relative flex-grow bg-slate-800 flex justify-center items-center"></div>
-        <div id="formula-ui" class="bg-slate-900/80 p-4 md:p-6 z-30 w-full backdrop-blur-sm border-t border-slate-700">
-            <div class="flex justify-between items-center mb-4">
-                 <button id="back-to-tracking-btn" class="bg-slate-700 hover:bg-slate-600 text-white py-2 px-4 rounded-lg">&lt; กลับไปสแกน</button>
-                 <h2 id="shape-title" class="text-2xl font-bold text-sky-400">รูปทรง</h2>
-            </div>
-            <div id="formula-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab('arView')"><i class="fas fa-cube"></i>AR View</button>
+            <button class="tab-button" onclick="openTab('manualCalc')"><i class="fas fa-calculator"></i>Manual</button>
         </div>
-    </div>
 
-    <div id="calculator-modal" class="fixed inset-0 bg-black/70 z-50 items-center justify-center backdrop-blur-sm" style="display: none;">
-        <div class="bg-slate-800 rounded-2xl p-6 shadow-2xl w-11/12 max-w-md m-4 fade-in">
-            <h3 id="calculator-title" class="text-2xl font-bold mb-4 text-sky-400">คำนวณสูตร</h3>
-            <form id="calculator-form"></form>
-            <div id="result-container" class="mt-4 p-4 bg-slate-700 rounded-lg" style="display: none;">
-                <p class="text-lg">ผลลัพธ์: <span id="result-value" class="font-bold text-2xl text-green-400"></span></p>
-            </div>
-            <div id="gemini-button-container" class="mt-4" style="display: none;">
-                <button id="gemini-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center transition-all">
-                </button>
-            </div>
-            <div id="gemini-result-container" class="mt-4 p-4 bg-slate-900 rounded-lg max-h-48 overflow-y-auto" style="display: none;">
-                <h4 class="text-lg font-bold text-purple-400 mb-2">ตัวอย่างจาก Gemini:</h4>
-                <div id="gemini-loading" class="text-center text-slate-400">กำลังคิด...</div>
-                <div id="gemini-result-text" class="text-slate-300 whitespace-pre-wrap"></div>
-            </div>
-            <div class="mt-6 flex justify-end">
-                <button id="close-calculator-btn" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-lg">ปิด</button>
-            </div>
+        <div id="manualCalc">
+             <h3>คำนวณปริมาตรด้วยตนเอง</h3>
+            <select id="manualShape">
+                <option value="Cuboid">ทรงสี่เหลี่ยม (Cuboid)</option>
+                <option value="Cylinder">ทรงกระบอก (Cylinder)</option>
+                <option value="Sphere">ทรงกลม (Sphere)</option>
+                <option value="Cone">ทรงกรวย (Cone)</option>
+            </select>
+            <div id="manualInputs"></div>
+            <button id="calculateManual">คำนวณ</button>
+            <h4 id="manualResult"></h4>
         </div>
     </div>
     
-    <div id="ar-unsupported-modal" class="fixed inset-0 bg-black/70 z-50 items-center justify-center backdrop-blur-sm p-4" style="display: none;">
-        <div class="text-center bg-slate-800 p-6 rounded-2xl shadow-2xl m-auto max-w-sm fade-in">
-            <h4 class="font-bold text-xl text-red-400">โหมด AR ไม่พร้อมใช้งาน</h4>
-            <p class="text-base text-slate-300 mt-2">
-                อุปกรณ์หรือเบราว์เซอร์ของคุณไม่รองรับ WebXR<br>
-                สำหรับ iPhone/iPad, โปรดลองเปิดใน Safari และตรวจสอบว่าได้เปิดใช้งาน "WebXR Device API" ใน:<br>
-                <strong class="text-slate-100 block mt-2">Settings > Safari > Advanced > Experimental Features</strong>
-            </p>
-            <button id="close-ar-unsupported-btn" class="mt-6 w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg">เข้าใจแล้ว</button>
-        </div>
-    </div>
+    <audio id="clickSound" src="https://www.zapsplat.com/wp-content/uploads/2015/sound-effects-zapsplat/zapsplat_multimedia_button_click_fast_short_002_79285.mp3" preload="auto"></audio>
 
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
-
-        const screens = { welcome: document.getElementById('welcome-screen'), tracking: document.getElementById('tracking-screen'), ar: document.getElementById('ar-screen') };
+    <script>
         const video = document.getElementById('video');
-        const detectionOverlay = document.getElementById('detection-overlay');
-        const startTrackingBtn = document.getElementById('start-tracking-btn');
-        const backToWelcomeBtn = document.getElementById('back-to-welcome-btn');
-        const backToTrackingBtn = document.getElementById('back-to-tracking-btn');
-        const trackingInstructions = document.getElementById('tracking-instructions');
-        const shapeTitle = document.getElementById('shape-title');
-        const formulaList = document.getElementById('formula-list');
-        const calculatorModal = document.getElementById('calculator-modal');
-        const calculatorTitle = document.getElementById('calculator-title');
-        const calculatorForm = document.getElementById('calculator-form');
-        const resultContainer = document.getElementById('result-container');
-        const resultValue = document.getElementById('result-value');
-        const closeCalculatorBtn = document.getElementById('close-calculator-btn');
-        const modelErrorText = document.getElementById('model-error-text');
-        const manualShapeSelector = document.getElementById('manual-shape-selector');
-        const geminiBtn = document.getElementById('gemini-btn');
-        const geminiButtonContainer = document.getElementById('gemini-button-container');
-        const geminiResultContainer = document.getElementById('gemini-result-container');
-        const geminiLoading = document.getElementById('gemini-loading');
-        const geminiResultText = document.getElementById('gemini-result-text');
-        const arUnsupportedModal = document.getElementById('ar-unsupported-modal');
-        const closeArUnsupportedBtn = document.getElementById('close-ar-unsupported-btn');
+        const overlayContainer = document.getElementById('overlayContainer');
+        const arContainer = document.getElementById('arObjectsContainer');
+        const loader = document.getElementById('loader');
+        const clickSound = document.getElementById('clickSound');
 
-        let model = null;
-        let videoStream = null;
-        let rafId = null;
-        let noDetectionTimer = null;
-        let detectionBoxes = [];
-        const MAX_BOXES = 10;
-        let arWarningShown = false;
-
-        let camera, scene, renderer, arObject;
-
-        const SHAPE_MAPPING = {
-            'book': 'สี่เหลี่ยมผืนผ้า', 'laptop': 'สี่เหลี่ยมผืนผ้า', 'tv': 'สี่เหลี่ยมผืนผ้า', 'cell phone': 'สี่เหลี่ยมผืนผ้า',
-            'remote': 'สี่เหลี่ยมผืนผ้า', 'keyboard': 'สี่เหลี่ยมผืนผ้า', 'microwave': 'สี่เหลี่ยมผืนผ้า', 'refrigerator': 'สี่เหลี่ยมผืนผ้า',
-            'clock': 'วงกลม', 'sports ball': 'วงกลม', 'frisbee': 'วงกลม', 'bowl': 'วงกลม', 'plate': 'วงกลม',
-            'donut': 'วงกลม', 'pizza': 'วงกลม',
-            'bottle': 'ทรงกระบอก', 'cup': 'ทรงกระบอก', 'vase': 'ทรงกระบอก',
-        };
-        const MANUAL_SHAPES = ['สี่เหลี่ยมผืนผ้า', 'วงกลม', 'ทรงกระบอก', 'สามเหลี่ยม'];
-        const FORMULAS = {
-            'สี่เหลี่ยมผืนผ้า': [
-                { name: 'คำนวณพื้นที่', display: 'A = l \\times w', inputs: ['ความยาว (ซม.)', 'ความกว้าง (ซม.)'], calc: (l, w) => l * w, unit: 'ตร.ซม.' },
-                { name: 'คำนวณเส้นรอบรูป', display: 'P = 2(l + w)', inputs: ['ความยาว (ซม.)', 'ความกว้าง (ซม.)'], calc: (l, w) => 2 * (l + w), unit: 'ซม.' },
-                { name: 'ความยาวเส้นทแยงมุม', display: 'd = \\sqrt{l^2 + w^2}', inputs: ['ความยาว (ซม.)', 'ความกว้าง (ซม.)'], calc: (l, w) => Math.sqrt(l**2 + w**2), unit: 'ซม.' }
-            ],
-            'วงกลม': [
-                { name: 'คำนวณพื้นที่', display: 'A = \\pi r^2', inputs: ['รัศมี (ซม.)'], calc: (r) => Math.PI * r * r, unit: 'ตร.ซม.' },
-                { name: 'คำนวณเส้นรอบวง', display: 'C = 2 \\pi r', inputs: ['รัศมี (ซม.)'], calc: (r) => 2 * Math.PI * r, unit: 'ซม.' },
-                { name: 'คำนวณเส้นผ่านศูนย์กลาง', display: 'd = 2r', inputs: ['รัศมี (ซม.)'], calc: (r) => 2 * r, unit: 'ซม.' }
-            ],
-            'ทรงกระบอก': [
-                { name: 'คำนวณปริมาตร', display: 'V = \\pi r^2 h', inputs: ['รัศมี (ซม.)', 'ความสูง (ซม.)'], calc: (r, h) => Math.PI * r * r * h, unit: 'ลบ.ซม.' },
-                { name: 'พื้นที่ผิวข้าง', display: 'A_L = 2 \\pi r h', inputs: ['รัศมี (ซม.)', 'ความสูง (ซม.)'], calc: (r, h) => 2 * Math.PI * r * h, unit: 'ตร.ซม.' },
-                { name: 'พื้นที่ผิวทั้งหมด', display: 'A_T = 2 \\pi r h + 2 \\pi r^2', inputs: ['รัศมี (ซม.)', 'ความสูง (ซม.)'], calc: (r, h) => (2 * Math.PI * r * h) + (2 * Math.PI * r**2), unit: 'ตร.ซม.' }
-            ],
-            'สามเหลี่ยม': [
-                { name: 'คำนวณพื้นที่', display: 'A = \\frac{1}{2} b h', inputs: ['ฐาน (ซม.)', 'ความสูง (ซม.)'], calc: (b, h) => 0.5 * b * h, unit: 'ตร.ซม.' },
-                { name: 'คำนวณเส้นรอบรูป', display: 'P = a + b + c', inputs: ['ด้าน a (ซม.)', 'ด้าน b (ซม.)', 'ด้าน c (ซม.)'], calc: (a, b, c) => a + b + c, unit: 'ซม.' }
-            ]
-        };
-
-        function switchScreen(screenName) {
-            Object.values(screens).forEach(s => s.classList.remove('active-screen'));
-            screens[screenName].classList.add('active-screen');
-        }
-
-        async function loadModel() {
-            startTrackingBtn.disabled = true;
-            document.getElementById('loading-model-text').style.display = 'flex';
-            document.getElementById('start-btn-text').style.display = 'none';
-            modelErrorText.style.display = 'none';
-            try {
-                model = await cocoSsd.load();
-                startTrackingBtn.disabled = false;
-                document.getElementById('start-btn-text').textContent = 'เริ่มต้นการเรียนรู้';
-            } catch (error) {
-                console.error("Failed to load model:", error);
-                modelErrorText.textContent = 'ไม่สามารถโหลดโมเดล AI ได้ โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง';
-                modelErrorText.style.display = 'block';
-                document.getElementById('start-btn-text').textContent = 'ลองอีกครั้ง';
-                startTrackingBtn.disabled = false;
-            } finally {
-                document.getElementById('loading-model-text').style.display = 'none';
-                document.getElementById('start-btn-text').style.display = 'inline';
+        class KalmanFilter {
+            constructor(R = 1, Q = 1, A = 1, B = 0, C = 1) {
+                this.R = R; this.Q = Q; this.A = A; this.B = B; this.C = C;
+                this.cov = NaN; this.x = NaN;
             }
-        }
-
-        async function startTracking() {
-            if (!model) {
-                if (modelErrorText.style.display === 'block') {
-                    loadModel();
-                    return;
+            filter(z, u = 0) {
+                if (isNaN(this.x)) {
+                    this.x = (1 / this.C) * z;
+                    this.cov = (1 / this.C) * this.Q * (1 / this.C);
+                } else {
+                    const predX = this.A * this.x + this.B * u;
+                    const predCov = this.A * this.cov * this.A + this.R;
+                    const K = predCov * this.C * (1 / (this.C * predCov * this.C + this.Q));
+                    this.x = predX + K * (z - this.C * predX);
+                    this.cov = predCov - K * this.C * predCov;
                 }
-                alert("โมเดล AI ยังไม่พร้อมใช้งาน กรุณารอสักครู่");
-                return;
+                return this.x;
             }
-            switchScreen('tracking');
+        }
+
+        let model;
+        const objectsOfInterest = ['bottle', 'book', 'apple', 'laptop', 'cup', 'cell phone', 'clock', 'vase'];
+        let detectedObjects = {};
+
+        const shapeData = [
+            { ratio: 0.3, shape: 'Cylinder' }, { ratio: 1.5, shape: 'Cuboid' },
+            { ratio: 0.6, shape: 'Cuboid' },   { ratio: 1.0, shape: 'Sphere' },
+            { ratio: 0.8, shape: 'Cylinder' },
+        ];
+        function predictShape(bbox) {
+            const ratio = bbox[2] / bbox[3];
+            let nearest = null;
+            let minDistance = Infinity;
+            shapeData.forEach(item => {
+                const distance = Math.abs(ratio - item.ratio);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearest = item.shape;
+                }
+            });
+            return nearest;
+        }
+        
+        const volumeFormulas = {
+            Cylinder: (w, h, d) => (Math.PI * Math.pow(w / 2, 2) * h).toFixed(2),
+            Cuboid:   (w, h, d) => (w * h * d).toFixed(2),
+            Sphere:   (w, h, d) => (4/3 * Math.PI * Math.pow(w / 2, 3)).toFixed(2),
+            Cone:     (w, h, d) => (1/3 * Math.PI * Math.pow(w / 2, 2) * h).toFixed(2)
+        };
+        const formulaStrings = {
+            Cylinder: 'V = πr²h', Cuboid: 'V = lwh',
+            Sphere: 'V = 4/3 πr³', Cone: 'V = 1/3 πr²h',
+        };
+
+        async function main() {
             try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                video.srcObject = videoStream;
-                video.addEventListener('loadeddata', detectObjects);
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    cocoSsd.load().then(loadedModel => {
+                        model = loadedModel;
+                        loader.style.display = 'none';
+                        detectFrame();
+                    });
+                };
             } catch (err) {
-                alert("ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการอนุญาต");
-                stopTracking();
+                console.error(err);
+                loader.innerHTML = "<i class='fas fa-exclamation-triangle'></i><p>เกิดข้อผิดพลาดในการเข้าถึงกล้อง</p>";
             }
         }
 
-        function stopTracking() {
-            if (videoStream) videoStream.getTracks().forEach(track => track.stop());
-            if (rafId) cancelAnimationFrame(rafId);
-            if (noDetectionTimer) clearTimeout(noDetectionTimer);
-            video.srcObject = null;
-            detectionBoxes.forEach(box => box.style.display = 'none');
-            switchScreen('welcome');
-        }
-        
-        async function detectObjects() {
-            if (!model || !video.srcObject || video.paused || video.ended || video.readyState < 3) {
-                rafId = requestAnimationFrame(detectObjects);
-                return;
-            }
-            const predictions = await model.detect(video, undefined, 0.45);
-            
-            const scaleX = detectionOverlay.clientWidth / video.videoWidth;
-            const scaleY = detectionOverlay.clientHeight / video.videoHeight;
-            let hasTargetPrediction = false;
+        const DISAPPEAR_THRESHOLD = 15;
 
-            predictions.forEach((p, i) => {
-                if (i >= MAX_BOXES) return;
+        async function detectFrame() {
+            const predictions = await model.detect(video);
+            const filteredPredictions = predictions.filter(p => objectsOfInterest.includes(p.class) && p.score > 0.5);
+            const currentIds = [];
 
-                const box = detectionBoxes[i];
-                const labelDiv = box.querySelector('.detection-label');
-                const derivedShape = SHAPE_MAPPING[p.class];
-                if (derivedShape) {
-                    hasTargetPrediction = true;
-                }
+            const scaleX = overlayContainer.clientWidth / video.videoWidth;
+            const scaleY = overlayContainer.clientHeight / video.videoHeight;
+            const scale = Math.min(scaleX, scaleY);
+            const offsetX = (overlayContainer.clientWidth - video.videoWidth * scale) / 2;
+            const offsetY = (overlayContainer.clientHeight - video.videoHeight * scale) / 2;
 
-                const score = Math.round(p.score * 100);
-                const [x, y, width, height] = p.bbox;
-                const label = derivedShape || p.class;
+            filteredPredictions.forEach((prediction, i) => {
+                const id = `${prediction.class}_${i}`;
+                currentIds.push(id);
                 
-                let color = 'border-slate-500';
-                let bgColor = 'bg-slate-500';
-                if (derivedShape === 'สี่เหลี่ยมผืนผ้า') { color = 'border-lime-400'; bgColor = 'bg-lime-400'; }
-                else if (derivedShape === 'วงกลม') { color = 'border-cyan-400'; bgColor = 'bg-cyan-400'; }
-                else if (derivedShape === 'ทรงกระบอก') { color = 'border-red-400'; bgColor = 'bg-red-400'; }
-
-                const clickableClass = derivedShape ? 'clickable-box' : '';
-                box.className = `detection-box ${color} ${clickableClass}`;
-                box.style.left = `${x * scaleX}px`;
-                box.style.top = `${y * scaleY}px`;
-                box.style.width = `${width * scaleX}px`;
-                box.style.height = `${height * scaleY}px`;
-                box.style.display = 'block';
-
-                labelDiv.className = `detection-label ${bgColor}`;
-                labelDiv.textContent = `${label} (${score}%)`;
-
-                if (derivedShape) {
-                    box.dataset.shape = derivedShape;
-                } else {
-                    delete box.dataset.shape;
+                if (!detectedObjects[id]) {
+                    detectedObjects[id] = {
+                        kalmanX: new KalmanFilter(), kalmanY: new KalmanFilter(),
+                        kalmanW: new KalmanFilter(), kalmanH: new KalmanFilter(),
+                        disappeared: 0, bboxDiv: null, arEntity: null
+                    };
                 }
+
+                const obj = detectedObjects[id];
+                if (!obj.bboxDiv) { obj.bboxDiv = createBboxDiv(id); }
+                
+                obj.disappeared = 0;
+
+                const scaledBbox = [
+                    prediction.bbox[0] * scale + offsetX,
+                    prediction.bbox[1] * scale + offsetY,
+                    prediction.bbox[2] * scale,
+                    prediction.bbox[3] * scale,
+                ];
+
+                const smoothBbox = [
+                    obj.kalmanX.filter(scaledBbox[0]), obj.kalmanY.filter(scaledBbox[1]),
+                    obj.kalmanW.filter(scaledBbox[2]), obj.kalmanH.filter(scaledBbox[3]),
+                ];
+                
+                obj.bbox = smoothBbox;
+                obj.class = prediction.class;
+                obj.score = prediction.score;
+                obj.shape = predictShape(smoothBbox);
+
+                updateBboxDiv(obj);
+                updateARObject(obj);
             });
 
-            for (let i = predictions.length; i < MAX_BOXES; i++) {
-                detectionBoxes[i].style.display = 'none';
-            }
-
-            if (hasTargetPrediction) {
-                if (noDetectionTimer) {
-                    clearTimeout(noDetectionTimer);
-                    noDetectionTimer = null;
-                }
-                manualShapeSelector.style.display = 'none';
-                trackingInstructions.textContent = `แตะที่กรอบวัตถุเพื่อสำรวจ`;
-            } else {
-                trackingInstructions.textContent = 'กำลังค้นหา... ลองหา หนังสือ, ขวดน้ำ, จาน';
-                if (!noDetectionTimer) {
-                    noDetectionTimer = setTimeout(() => {
-                        trackingInstructions.textContent = 'หาไม่เจอ? ลองเลือกรูปทรงด้วยตัวเอง';
-                        manualShapeSelector.style.display = 'grid';
-                    }, 4000);
+            for (const id in detectedObjects) {
+                if (!currentIds.includes(id)) {
+                    detectedObjects[id].disappeared++;
+                    if (detectedObjects[id].disappeared > DISAPPEAR_THRESHOLD) {
+                        if (detectedObjects[id].bboxDiv) { detectedObjects[id].bboxDiv.remove(); }
+                        if (detectedObjects[id].arEntity) { arContainer.removeChild(detectedObjects[id].arEntity); }
+                        delete detectedObjects[id];
+                    }
                 }
             }
-            rafId = requestAnimationFrame(detectObjects);
+            requestAnimationFrame(detectFrame);
         }
         
-        function onShapeSelected(shape) {
-            if (videoStream) videoStream.getTracks().forEach(track => track.stop());
-            if (rafId) cancelAnimationFrame(rafId);
-            if (noDetectionTimer) clearTimeout(noDetectionTimer);
-            video.srcObject = null;
-            startAR(shape);
+        function createBboxDiv(id) {
+            const bboxDiv = document.createElement('div');
+            bboxDiv.className = 'bbox-div';
+            bboxDiv.dataset.id = id;
+            bboxDiv.innerHTML = `<div class="bbox-label"></div><div class="bbox-confidence"><div class="confidence-bar"></div></div>`;
+            overlayContainer.appendChild(bboxDiv);
+            bboxDiv.addEventListener('click', handleBboxClick);
+            return bboxDiv;
+        }
+        
+        function updateBboxDiv(obj) {
+            obj.bboxDiv.style.left = `${obj.bbox[0]}px`;
+            obj.bboxDiv.style.top = `${obj.bbox[1]}px`;
+            obj.bboxDiv.style.width = `${obj.bbox[2]}px`;
+            obj.bboxDiv.style.height = `${obj.bbox[3]}px`;
+            obj.bboxDiv.querySelector('.bbox-label').innerText = `${obj.class} (${obj.shape})`;
+            obj.bboxDiv.querySelector('.confidence-bar').style.width = `${obj.score * 100}%`;
+        }
+        
+        function updateARObject(obj) {
+            if (!obj.arEntity) {
+                obj.arEntity = document.createElement('a-entity');
+                arContainer.appendChild(obj.arEntity);
+            }
+
+            let geometry, scale;
+            const arScaleFactor = 3; 
+            const scaleX = obj.bbox[2] / overlayContainer.clientWidth * arScaleFactor;
+            const scaleY = obj.bbox[3] / overlayContainer.clientWidth * arScaleFactor;
+
+            switch (obj.shape) {
+                case 'Cylinder': 
+                    geometry = `primitive: cylinder; height: ${scaleY}; radius: ${scaleX/2};`; 
+                    scale = '1 1 1';
+                    break;
+                case 'Sphere':
+                    geometry = `primitive: sphere; radius: ${scaleX/2};`;
+                    scale = '1 1 1';
+                    break;
+                default: 
+                    geometry = (obj.shape === 'Cone') ? 'primitive: cone;' : 'primitive: box;';
+                    scale = `${scaleX} ${scaleY} ${Math.min(scaleX, scaleY)}`;
+            }
+            
+            obj.arEntity.setAttribute('geometry', geometry);
+            obj.arEntity.setAttribute('scale', scale);
+            obj.arEntity.setAttribute('material', 'color: #00aaff; wireframe: true;');
+
+            const centerX = obj.bbox[0] + obj.bbox[2] / 2;
+            const centerY = obj.bbox[1] + obj.bbox[3] / 2;
+            const normalizedX = (centerX / overlayContainer.clientWidth) * 2 - 1;
+            const normalizedY = -(centerY / overlayContainer.clientHeight) * 2 + 1;
+            const distance = -1.5;
+            obj.arEntity.setAttribute('position', `${normalizedX} ${normalizedY} ${distance}`);
+        }
+        
+        function handleBboxClick(event) {
+            clickSound.play();
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            const id = event.currentTarget.dataset.id;
+            const obj = detectedObjects[id];
+            
+            document.querySelectorAll('.info-popup').forEach(p => p.remove());
+
+            if (obj) {
+                const popup = document.createElement('div');
+                popup.className = 'info-popup';
+
+                const { class: name, shape, bbox, score } = obj;
+                const pixelToCm = 0.1;
+                const widthCm = bbox[2] * pixelToCm;
+                const heightCm = bbox[3] * pixelToCm;
+                const depthCm = widthCm * 0.8;
+                const volume = volumeFormulas[shape] ? volumeFormulas[shape](widthCm, heightCm, depthCm) : 'N/A';
+                
+                popup.innerHTML = `
+                    <h3>${name.charAt(0).toUpperCase() + name.slice(1)}</h3>
+                    <p><strong>รูปทรง:</strong> ${shape}</p>
+                    <p><strong>ความมั่นใจ:</strong> ${Math.round(score * 100)}%</p>
+                    <p><strong>สูตร:</strong> ${formulaStrings[shape] || 'N/A'}</p>
+                    <p><strong>ปริมาตร:</strong> ${volume} cm³ (โดยประมาณ)</p>
+                `;
+                
+                const popupX = bbox[0] + bbox[2] + 10;
+                const popupY = bbox[1];
+                popup.style.left = `${popupX}px`;
+                popup.style.top = `${popupY}px`;
+                overlayContainer.appendChild(popup);
+
+                setTimeout(() => { if (popup) popup.remove(); }, 5000);
+            }
         }
 
-        function startAR(shape) {
-            switchScreen('ar');
-            shapeTitle.textContent = shape;
-            formulaList.innerHTML = '';
-            const shapeFormulas = FORMULAS[shape] || [];
-            shapeFormulas.forEach(formula => {
-                const card = document.createElement('button');
-                card.className = 'bg-slate-800 hover:bg-slate-700 p-5 rounded-lg text-left w-full transition-all transform hover:scale-105';
-                card.innerHTML = `<h4 class="font-bold text-xl text-slate-200">${formula.name}</h4><p class="text-sm text-slate-400">${formula.inputs.join(', ')}</p>`;
-                card.onclick = () => showCalculator(shape, formula);
-                formulaList.appendChild(card);
+        // --- Tab and Manual Calc Logic ---
+        const manualShape = document.getElementById('manualShape');
+        const manualInputs = document.getElementById('manualInputs');
+        const calculateManualBtn = document.getElementById('calculateManual');
+        const manualResult = document.getElementById('manualResult');
+
+        const shapeInputs = {
+            Cuboid: ['ความยาว (l)', 'ความกว้าง (w)', 'ความสูง (h)'],
+            Cylinder: ['รัศมี (r)', 'ความสูง (h)'], Sphere: ['รัศมี (r)'],
+            Cone: ['รัศมี (r)', 'ความสูง (h)']
+        };
+        const inputIds = {
+            Cuboid: ['l', 'w', 'h'], Cylinder: ['r', 'h'],
+            Sphere: ['r'], Cone: ['r', 'h']
+        };
+
+        function openTab(tabName) {
+            const manualCalcTab = document.getElementById('manualCalc');
+            document.getElementById('mainContainer').style.display = (tabName === 'arView') ? 'block' : 'none';
+            manualCalcTab.style.display = (tabName === 'manualCalc') ? 'block' : 'none';
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tab-button[onclick="openTab('${tabName}')"]`).classList.add('active');
+        }
+
+        function updateManualInputs() {
+            const shape = manualShape.value;
+            manualInputs.innerHTML = '';
+            shapeInputs[shape].forEach((label, index) => {
+                const id = inputIds[shape][index];
+                manualInputs.innerHTML += `<input type="number" id="manual_${id}" placeholder="${label} (cm)">`;
             });
-            initARScene(shape);
         }
+        manualShape.addEventListener('change', updateManualInputs);
 
-        async function initARScene(shape) {
-            const container = document.getElementById('ar-canvas-container');
-            container.innerHTML = '';
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, container.clientWidth / container.clientHeight, 0.01, 20);
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-            light.position.set(0.5, 1, 0.25);
-            scene.add(light);
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.xr.enabled = true;
-            container.appendChild(renderer.domElement);
+        calculateManualBtn.addEventListener('click', () => {
+            const shape = manualShape.value;
+            const ids = inputIds[shape];
+            const values = ids.map(id => parseFloat(document.getElementById(`manual_${id}`).value));
             
-            if ('xr' in navigator) {
-                try {
-                    const supported = await navigator.xr.isSessionSupported('immersive-ar');
-                    if (supported) {
-                        const arButton = ARButton.createButton(renderer);
-                        container.appendChild(arButton);
-                    } else {
-                        showArUnsupportedModal();
-                    }
-                } catch (e) {
-                    console.error("Error checking AR support:", e);
-                    showArUnsupportedModal();
-                }
-            } else {
-                showArUnsupportedModal();
-            }
-            
-            let geometry;
-            let color = '#38bdf8';
-            switch(shape) {
-                case 'สี่เหลี่ยมผืนผ้า':
-                    geometry = new THREE.BoxGeometry(0.2, 0.15, 0.02);
-                    color = '#a3e635';
-                    break;
-                case 'วงกลม':
-                    geometry = new THREE.CircleGeometry(0.1, 64);
-                    color = '#22d3ee';
-                    break;
-                case 'ทรงกระบอก':
-                    geometry = new THREE.CylinderGeometry(0.08, 0.08, 0.25, 64);
-                    color = '#f87171';
-                    break;
-                case 'สามเหลี่ยม':
-                    const triShape = new THREE.Shape().moveTo(-0.1, -0.1).lineTo(0.1, -0.1).lineTo(0, 0.15).closePath();
-                    geometry = new THREE.ShapeGeometry(triShape);
-                    color = '#f97316';
-                    break;
-                default:
-                    geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
-            }
-            const material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.1, roughness: 0.5 });
-            arObject = new THREE.Mesh(geometry, material);
-            arObject.position.set(0, 0, -0.5);
-            scene.add(arObject);
-            
-            renderer.setAnimationLoop(renderAR);
-        }
-
-        function showArUnsupportedModal() {
-            if (!arWarningShown) {
-                arUnsupportedModal.style.display = 'flex';
-                arWarningShown = true;
-            }
-        }
-
-        function renderAR() {
-            if (arObject) {
-                 arObject.rotation.y += 0.005;
-                 arObject.rotation.x += 0.002;
-            }
-            renderer.render(scene, camera);
-        }
-
-        function showCalculator(shape, formula) {
-            calculatorTitle.textContent = formula.name;
-            calculatorForm.innerHTML = '';
-            resultContainer.style.display = 'none';
-            geminiButtonContainer.style.display = 'none';
-            geminiResultContainer.style.display = 'none';
-            geminiBtn.innerHTML = `<span class="mr-2 text-xl"></span> หาตัวอย่างการใช้งานจริง`;
-
-            const formulaDisplayContainer = document.createElement('div');
-            formulaDisplayContainer.className = 'text-center p-4 bg-slate-900 rounded-lg mb-4';
-            const formulaDisplay = document.createElement('span');
-            formulaDisplay.className = 'text-2xl md:text-3xl text-amber-300';
-            formulaDisplayContainer.appendChild(formulaDisplay);
-            
-            calculatorForm.appendChild(formulaDisplayContainer);
-            
-            if (window.katex) {
-                katex.render(formula.display, formulaDisplay, {
-                    throwOnError: false,
-                    displayMode: true
-                });
-            } else {
-                formulaDisplay.textContent = formula.display;
-            }
-
-            formula.inputs.forEach(inputName => {
-                const inputId = inputName.split(' ')[0];
-                const div = document.createElement('div');
-                div.className = 'mb-3';
-                div.innerHTML = `<label for="${inputId}" class="block text-slate-300 text-sm font-bold mb-1">${inputName}</label><input type="number" id="${inputId}" name="${inputId}" class="shadow-inner appearance-none border border-slate-600 rounded w-full py-2 px-3 bg-slate-700 text-white leading-tight focus:outline-none focus:ring-2 focus:ring-sky-500" required step="any">`;
-                calculatorForm.appendChild(div);
-            });
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'submit';
-            submitBtn.className = 'w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg';
-            submitBtn.textContent = 'คำนวณ';
-            calculatorForm.appendChild(submitBtn);
-            calculatorForm.onsubmit = (e) => {
-                e.preventDefault();
-                const values = Array.from(new FormData(e.target).values()).map(v => parseFloat(v));
-                const result = formula.calc(...values);
-                resultValue.textContent = `${result.toLocaleString(undefined, { maximumFractionDigits: 3 })} ${formula.unit}`;
-                resultContainer.style.display = 'block';
-                geminiButtonContainer.style.display = 'block';
-                geminiResultContainer.style.display = 'none'; 
-                geminiBtn.onclick = () => callGeminiAPI(shape, formula.name, values, result, formula.unit);
-            };
-            calculatorModal.style.display = 'flex';
-        }
-
-        async function callGeminiAPI(shape, formulaName, values, result, unit) {
-            geminiResultContainer.style.display = 'block';
-            geminiLoading.style.display = 'block';
-            geminiResultText.textContent = '';
-            geminiBtn.disabled = true;
-            
-            const apiKey = "AIzaSyAxrgI_CzGfUxHZSAx2CCaUP-LievvmeuY"; 
-            if (!apiKey) {
-                geminiResultText.textContent = 'ฟีเจอร์นี้ต้องใช้ API Key และจะทำงานได้เมื่ออยู่บนเซิร์ฟเวอร์จริงเท่านั้น (สำหรับนักพัฒนา: โปรดใส่ API Key ของคุณเพื่อทดลองใช้)';
-                geminiLoading.style.display = 'none';
-                geminiBtn.disabled = false;
+            if (values.some(isNaN)) {
+                manualResult.innerText = "กรุณากรอกตัวเลขให้ครบทุกช่อง";
                 return;
             }
-
-            const prompt = `ฉันเป็นแอปสอนคณิตศาสตร์ด้วย AR และเพิ่งคำนวณโจทย์เสร็จ\n- รูปทรง: ${shape}\n- สูตรที่ใช้: ${formulaName}\n- ค่าที่ใส่: ${values.join(', ')}\n- ผลลัพธ์: ${result.toFixed(2)} ${unit}\n\nช่วยอธิบายผลลัพธ์นี้แบบง่ายๆ และยกตัวอย่างการใช้งานในชีวิตจริงที่เด็กๆ จะเข้าใจได้ให้หน่อย 2-3 ตัวอย่าง`;
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
-                }
-                const data = await response.json();
-                if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts) {
-                    geminiResultText.textContent = data.candidates[0].content.parts[0].text;
-                } else {
-                    console.error("Gemini API call successful, but no valid content returned.", data);
-                    geminiResultText.textContent = 'ขออภัย AI ไม่สามารถให้คำตอบที่เหมาะสมได้ในขณะนี้';
-                }
-            } catch (error) {
-                console.error("Gemini API call failed:", error);
-                geminiResultText.textContent = 'เกิดข้อผิดพลาดในการเชื่อมต่อกับ AI โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองอีกครั้ง';
-            } finally {
-                geminiLoading.style.display = 'none';
-                geminiBtn.disabled = false;
-            }
-        }
+            
+            let volume = 0;
+            if (shape === 'Cuboid') volume = values[0] * values[1] * values[2];
+            if (shape === 'Cylinder') volume = Math.PI * Math.pow(values[0], 2) * values[1];
+            if (shape === 'Sphere') volume = (4/3) * Math.PI * Math.pow(values[0], 3);
+            if (shape === 'Cone') volume = (1/3) * Math.PI * Math.pow(values[0], 2) * values[1];
+            manualResult.innerText = `ปริมาตร: ${volume.toFixed(2)} cm³`;
+        });
         
-        function setupManualSelectors() {
-            manualShapeSelector.innerHTML = '';
-            MANUAL_SHAPES.forEach(shape => {
-                const btn = document.createElement('button');
-                btn.className = 'bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 rounded-lg transition-all';
-                btn.textContent = shape;
-                btn.onclick = () => onShapeSelected(shape);
-                manualShapeSelector.appendChild(btn);
-            });
-        }
-
-        function createDetectionBoxPool() {
-            for (let i = 0; i < MAX_BOXES; i++) {
-                const box = document.createElement('div');
-                const labelDiv = document.createElement('div');
-                labelDiv.className = 'detection-label';
-                box.appendChild(labelDiv);
-                box.style.display = 'none';
-                detectionOverlay.appendChild(box);
-                detectionBoxes.push(box);
-            }
-        }
-
-        function handleInitialAction() {
-            if (model) {
-                startTracking();
-            } else {
-                loadModel();
-            }
-        }
-
-        startTrackingBtn.addEventListener('click', handleInitialAction);
-        backToWelcomeBtn.addEventListener('click', stopTracking);
-        backToTrackingBtn.addEventListener('click', () => {
-            if (renderer && renderer.xr.getSession()) renderer.xr.getSession().end();
-            if(renderer) renderer.setAnimationLoop(null);
-            renderer = null;
-            startTracking();
-        });
-        closeCalculatorBtn.addEventListener('click', () => {
-            calculatorModal.style.display = 'none';
-        });
-        closeArUnsupportedBtn.addEventListener('click', () => {
-            arUnsupportedModal.style.display = 'none';
-        });
-
-        detectionOverlay.addEventListener('click', (event) => {
-            const targetBox = event.target.closest('.clickable-box');
-            if (targetBox && targetBox.dataset.shape) {
-                onShapeSelected(targetBox.dataset.shape);
-            }
-        });
-
-        loadModel();
-        setupManualSelectors();
-        createDetectionBoxPool();
+        updateManualInputs();
+        main();
     </script>
 </body>
 </html>
